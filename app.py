@@ -138,28 +138,34 @@ def modificar_destino(codigo):
     nueva_ciudad = request.form.get("ciudad")
     nuevo_precio = request.form.get("precio")
 
-    if 'imagen' in request.files:
+    destino = catalogo.consultar_destino(codigo)
+    if not destino:
+        return jsonify({"mensaje": "Destino no encontrado"}), 404
+
+    # Manejar la nueva imagen si se ha proporcionado
+    if 'imagen' in request.files and request.files['imagen'].filename != '':
         imagen = request.files['imagen']
         nombre_imagen = secure_filename(imagen.filename)
         nombre_base, extension = os.path.splitext(nombre_imagen)
         nombre_imagen = f"{nombre_base}_{int(time.time())}{extension}"
-
-        destino = catalogo.consultar_destino(codigo)
-        if destino:
-            imagen_vieja = destino["imagen_url"]
-            ruta_imagen = os.path.join(ruta_destino, imagen_vieja)
-
-            if os.path.exists(ruta_imagen):
-                os.remove(ruta_imagen)
+        
+        # Eliminar la imagen anterior si existe
+        imagen_vieja = destino["imagen_url"]
+        if imagen_vieja:
+            ruta_imagen_vieja = os.path.join(ruta_destino, imagen_vieja)
+            if os.path.exists(ruta_imagen_vieja):
+                os.remove(ruta_imagen_vieja)
+        
+        # Guardar la nueva imagen
+        imagen.save(os.path.join(ruta_destino, nombre_imagen))
     else:
-        destino = catalogo.consultar_destino(codigo)
-        if destino:
-            nombre_imagen = destino["imagen_url"]
+        nombre_imagen = destino["imagen_url"]
 
+    # Actualizar los datos del destino en la base de datos
     if catalogo.modificar_destino(codigo, nuevo_pais, nueva_ciudad, nuevo_precio, nombre_imagen):
-        return jsonify({"mensaje": "Destino modificado"}), 200
+        return jsonify({"mensaje": "Destino modificado correctamente"}), 200
     else:
-        return jsonify({"mensaje": "Destino no encontrado"}), 404
+        return jsonify({"mensaje": "Error al modificar el destino"}), 500
 
 @app.route("/destinos/<int:codigo>", methods=["DELETE"])
 def eliminar_destino(codigo):
